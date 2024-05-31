@@ -7,20 +7,24 @@
 #include <iostream>
 #include <cstdio>
 using namespace std;
+
 const double Xmin = 0.0, Xmax = 10.0;
 const double Ymin = 0.0, Ymax = 10.0;
 double move_left_right = 0.0;
 double move_up_down = 0.0;
 int level = 1;
+const double countdown_duration = 9;
+double start_time;
+double elapsed_time;
+double remaining_time;
+double top;
 
 double circle_speed = 0.05;
-const int num_circles = 50;
-char buffer[50]; 
-std::string str(buffer);
+const int num_circles = 30;
+
 struct Circle {
     double x, y;
 };
-
 
 Circle circles[num_circles];
 
@@ -30,20 +34,40 @@ double randDouble(double min, double max) {
     return min + (rand() / (RAND_MAX / (max - min)));
 }
 
+void restartGame() {
+    level = 1;
+    elapsed_time = 0;
+    move_left_right = 0;
+    move_up_down = 0;
+    start_time = glutGet(GLUT_ELAPSED_TIME) / 1000.0; 
+}
+void checkCollision() {
+    for (int i = 0; i < num_circles; i++) {
+        double circle_center_x = circles[i].x;
+        double circle_center_y = circles[i].y;
+
+        if (circle_center_x >= (4.75 + move_left_right - 0.1) && circle_center_x <= (5.25 + move_left_right + 0.1) &&
+            circle_center_y >= (0.2 + move_up_down - 0.1) && circle_center_y <= (0.5 + move_up_down + 0.1)) {
+            restartGame();
+            
+        }
+    }
+}
+
 void mySpecialKeyFunc(int key, int x, int y) {
     switch (key) {
-    case(GLUT_KEY_LEFT):
+    case (GLUT_KEY_LEFT):
         if (move_left_right > -9.5) {
             move_left_right -= 0.25;
         }
         break;
 
-    case(GLUT_KEY_RIGHT):
+    case (GLUT_KEY_RIGHT):
         if (move_left_right < 9.5) {
             move_left_right += 0.25;
         }
         break;
-    case(GLUT_KEY_UP):
+    case (GLUT_KEY_UP):
         if (move_up_down < 8.5) {
             move_up_down += 0.25;
         }
@@ -53,7 +77,7 @@ void mySpecialKeyFunc(int key, int x, int y) {
             move_up_down = 0.0;
         }
         break;
-    case(GLUT_KEY_DOWN):
+    case (GLUT_KEY_DOWN):
         if (move_up_down > 0) {
             move_up_down -= 0.25;
         }
@@ -63,8 +87,8 @@ void mySpecialKeyFunc(int key, int x, int y) {
 
 void drawCircle(Circle& circle) {
     glBegin(GL_POLYGON);
-    glColor3f(0.0, 1.0, 0.0);
-    for (int i = 0; i < num_circles; i++) {
+    glColor3f(1.0, 1.0, 1.0);
+    for (int i = 0; i < 100; i++) { 
         double teta = 2 * 3.14 * i / 100;
         double x = circle.x + 0.1 * cos(teta);
         double y = circle.y + 0.1 * sin(teta);
@@ -75,13 +99,14 @@ void drawCircle(Circle& circle) {
 
 void updateCirclePositions() {
     for (int i = 0; i < num_circles; i++) {
-        circles[i].x -= circle_speed*(level/2.5);
+        circles[i].x -= circle_speed * (level / 2.5);
         if (circles[i].x < Xmin) {
-            circles[i].x = Xmax;  
-            circles[i].y = randDouble(1.1, 9); 
+            circles[i].x = Xmax;
+            circles[i].y = randDouble(1.1, 9);
         }
     }
 }
+
 void renderBitmapString(float x, float y, void* font, const char* string) {
     glRasterPos2f(x, y);
     for (const char* c = string; *c != '\0'; c++) {
@@ -93,7 +118,7 @@ void drawScene(void) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glBegin(GL_TRIANGLES);
-    glColor3f(0.0, 1.0, 0.0);
+    glColor3f(1.0, 1.0, 1.0);
     glVertex3f(4.75 + move_left_right, 0.2 + move_up_down, 0.0);
     glVertex3f(5.25 + move_left_right, 0.2 + move_up_down, 0.0);
     glVertex3f(5.0 + move_left_right, 0.5 + move_up_down, 0.0);
@@ -102,12 +127,33 @@ void drawScene(void) {
     for (int i = 0; i < num_circles; i++) {
         drawCircle(circles[i]);
     }
+
     char str[50];
     sprintf_s(str, sizeof(str), "level %d", level);
-    glColor3f(0.0, 1.0, 1.0);
+    glColor3f(1.0, 1.0, 1.0);
     void* font = GLUT_BITMAP_TIMES_ROMAN_24;
-    renderBitmapString(0, 0.3, font, str);
+    renderBitmapString(0.4, 0.3, font, str);
 
+    elapsed_time = (glutGet(GLUT_ELAPSED_TIME) / 1000) - start_time;
+    remaining_time = countdown_duration - elapsed_time;
+    top = remaining_time / countdown_duration;
+
+    glBegin(GL_POLYGON);
+    if (top >= 0.3) {
+        glColor3f(0.0, 1, 0.0);
+    }
+    else {
+        glColor3f(1.0, 0, 0);
+    }
+    glVertex3f(0, 0, 0);
+    glVertex3f(0.1, 0, 0);
+    glVertex3f(0.1, Ymax * top, 0);
+    glVertex3f(0, Ymax * top, 0);
+    glEnd();
+    if (remaining_time <= 0) {
+        restartGame();
+    }
+    checkCollision();
     glutSwapBuffers();
 }
 
@@ -117,7 +163,9 @@ void timerFunc(int value) {
     glutTimerFunc(16, timerFunc, 0);
 }
 
-void initRendering() {}
+void initRendering() {
+    glClearColor(0.0, 0.0, 0.0, 1.0);
+}
 
 void resizeWindow(int w, int h) {
     double scale, center;
@@ -149,9 +197,10 @@ void resizeWindow(int w, int h) {
     glOrtho(windowXmin, windowXmax, windowYmin, windowYmax, -1, 1);
 }
 
-
 int main(int argc, char** argv) {
-    srand(time(NULL));  
+    start_time = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
+
+    srand(time(NULL));
 
     for (int i = 0; i < num_circles; i++) {
         circles[i].x = randDouble(Xmin, Xmax);
